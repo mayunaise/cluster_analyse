@@ -1,9 +1,7 @@
 import argparse
-from ast import arg
 import os
-from parser import ClusterDataParser, get_cluster_parser_fn
+from parser import ClusterDataParser
 from visualizer import get_cluster_visualizer_fn
-from omegaconf import DictConfig
 from constant import Constant
 from data_preprocessor import DataPreprocessor
 
@@ -23,9 +21,10 @@ def main():
     arg_parser = argparse.ArgumentParser(description="集群调度可视化")
     arg_parser.add_argument("--input-path", default="test", help="profiling数据的原始路径")
     arg_parser.add_argument("--profiler-type", default="mstx", help="性能数据种类")
+    arg_parser.add_argument("--data-type", default="text", help="性能文件类型")
     arg_parser.add_argument("--output-path", default="test", help="输出路径")
     arg_parser.add_argument("--vis-type", default="html", help="可视化类型")
-    arg_parser.add_argument("--rank_list", type=str, help="Rank id list", default='all')
+    arg_parser.add_argument("--rank-list", type=str, help="Rank id list", default='all')
     args = arg_parser.parse_args()
 
     # Allocate profiling data
@@ -33,19 +32,19 @@ def main():
 
     # Prepare parser configuration
     parser_params = {
-        Constant.DATA_TYPE: Constant.TEXT,  # Default to TEXT type
+        Constant.DATA_TYPE: args.data_type,  # Default to TEXT type
         Constant.DATA_MAP: data_map,
         Constant.RANK_LIST: args.rank_list,
+        Constant.PROFILER_TYPE: args.profiler_type
     }
     visualizer_params = {}
 
-    parser_config = DictConfig(parser_params)
-    visualizer_config = DictConfig(visualizer_params)
+    parser_config = parser_params
+    visualizer_config = visualizer_params
 
     # Get and call parser function
     json_parser = ClusterDataParser(parser_config)
-    parser_fn = json_parser.get_cluster_parser_fn(args.profiler_type)
-    parser_fn({})
+    json_parser.parse()
     data = json_parser.get_data()
 
 

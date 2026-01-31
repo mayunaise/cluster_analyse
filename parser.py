@@ -2,29 +2,11 @@ import logging
 from typing import List, Dict, Callable, Optional
 import json
 import os
-
 import pandas as pd
-from omegaconf import DictConfig
 from constant import Constant
 
 
 logger = logging.getLogger(__name__)
-
-ClusterParserFn = Callable[
-    [
-        str,
-        str,
-        DictConfig
-    ]
-]
-
-CLUSTER_PARSER_REGISTRY: dict[str, ClusterParserFn] = {}
-
-def register_cluster_parser(name: str) -> Callable[[ClusterParserFn], ClusterParserFn]:
-    def decorator(func: ClusterParserFn) -> ClusterParserFn:
-        CLUSTER_PARSER_REGISTRY[name] = func
-        return func
-    return decorator
 
 
 class ClusterDataParser:
@@ -33,28 +15,29 @@ class ClusterDataParser:
 
     def __init__(self, params) -> None:
         self.events_summary: Optional[pd.DataFrame] = None
+        self._profiler_type = params.get(Constant.PROFILER_TYPE, "mstx")
         self._data_type = params.get(Constant.DATA_TYPE, {})
         self._data_map = params.get(Constant.DATA_MAP, {})
         rank_list = params.get(Constant.RANK_LIST, 'all')
         self._rank_list = rank_list if rank_list == "all" else [int(rank) for rank in rank_list.split(",") if rank.isdigit()]
         pass
 
-    def get_cluster_parser_fn(self, fn_name):
-        if fn_name not in CLUSTER_PARSER_REGISTRY:
-            raise ValueError(
-                f"Unsupported cluster parser: {fn_name}. Supported fns are: {list(CLUSTER_PARSER_REGISTRY.keys())}"
-            )
-        return CLUSTER_PARSER_REGISTRY[fn_name]
+    def parse(self):
+        """Parse data based on _profiler_type."""
+        if self._profiler_type == "mstx":
+            return self.cluster_parser_mstx()
+        elif self._profiler_type == "nvtx":
+            return self.cluster_parser_nvtx()
+        else:
+            raise ValueError(f"Unsupported profiler type: {self._profiler_type}")
 
-    @register_cluster_parser("mstx")
     def cluster_parser_mstx(self):
         mapper_res = self.mapper_func()
         self.reducer_func(mapper_res)
         logger.info("Parsed in mstx")
         pass
 
-    @register_cluster_parser("nvtx")
-    def cluster_parser_nvtx(self, input_path: str, output_path: str, config: DictConfig) -> Optional:
+    def cluster_parser_nvtx(self):
         logger.info("Parsed in mstx")
         pass
 
@@ -70,7 +53,6 @@ class ClusterDataParser:
         events: List[Dict] = []
 
         # TODO: check file size
-
         with open(profiler_data_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         

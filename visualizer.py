@@ -1,7 +1,7 @@
+from ast import Dict
 import os
 from typing import Callable, List
 from dataclasses import dataclass
-from omegaconf import DictConfig
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,7 +10,7 @@ ClusterVisualizerFn = Callable[
     [
         pd.DataFrame,
         str,
-        DictConfig
+        Dict
     ],
     None,
 ]
@@ -38,13 +38,13 @@ def get_cluster_visualizer_fn(fn_name):
     return CLUSTER_VISUALIZER_REGISTRY[fn_name]
 
 @register_cluster_visualizer("html")
-def cluster_visualizer_html(data: pd.DataFrame, output_path: str, config: DictConfig) -> None:
+def cluster_visualizer_html(data: pd.DataFrame, output_path: str, config: Dict) -> None:
     generate_rl_timeline(data, output_path)
     print("in html")
     pass
 
 @register_cluster_visualizer("chart")
-def cluster_visualizer_chart(data: pd.DataFrame, output_path: str, config: DictConfig) -> None:
+def cluster_visualizer_chart(data: pd.DataFrame, output_path: str, config: Dict) -> None:
     print("in chart")
     pass
 
