@@ -2,7 +2,9 @@ from collections import defaultdict
 import json
 import os
 from constant import Constant
-from verl.tools.cluster_analysis.parser import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DataPreprocessor:
     def __init__(self, path_list: str) -> None:
