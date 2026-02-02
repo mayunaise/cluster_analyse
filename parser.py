@@ -3,6 +3,8 @@ from typing import List, Dict, Callable, Optional
 import json
 import os
 import pandas as pd
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 from constant import Constant
 
 
@@ -68,14 +70,14 @@ class ClusterDataParser:
                 continue
             # Convert nanoseconds to milliseconds
             ns_to_ms = Constant.NS_TO_US * Constant.US_TO_MS
-            start_time_ms = row["ts"] / ns_to_ms
-            end_time_ms = start_time_ms + row["dur"] / ns_to_ms
-            duration_ms = row["dur"] / ns_to_ms
+            start_time_ms = float(row["ts"]) / ns_to_ms
+            end_time_ms = start_time_ms + float(row["dur"]) / ns_to_ms
+            duration_ms = float(row["dur"]) / ns_to_ms
 
             event_data = {
                 'name': row["name"],
                 "roll": roll,
-                'domain': row["domain"],
+                'domain': args["domain"],
                 'start_time_ms': start_time_ms,
                 'end_time_ms': end_time_ms,
                 'duration_ms': duration_ms,
@@ -92,14 +94,43 @@ class ClusterDataParser:
     def mapper_func(self):
         data_maps = self._get_rank_path_with_roll()
 
-        # Fall back to serial processing
-        logger.info("Using serial processing for mapper_func")
-        return [self._mapper_func(data_map) for data_map in data_maps]
+        if not data_maps:
+            logger.info("No data maps to process")
+            return []
+
+        total_ranks = len(data_maps)
+        max_workers = min(total_ranks, multiprocessing.cpu_count())
+        logger.info(f"Starting parallel processing: {total_ranks} ranks with {max_workers} workers")
+
+        results = []
+        completed = 0
+
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任务
+            future_to_rank = {
+                executor.submit(self._mapper_func, data_map): data_map[Constant.RANK_ID]
+                for data_map in data_maps
+            }
+
+            # 收集结果
+            for future in as_completed(future_to_rank):
+                rank_id = future_to_rank[future]
+                completed += 1
+                progress = (completed / total_ranks) * 100
+                try:
+                    result = future.result()
+                    results.append(result)
+                    logger.info(f"Completed rank {rank_id}: {completed}/{total_ranks} ({progress:.1f}%)")
+                except Exception as e:
+                    logger.error(f"Failed to process rank {rank_id}: {e}")
+
+        logger.info(f"Parallel processing completed: {completed}/{total_ranks} ranks processed")
+        return results
 
     def _mapper_func(self, data_map):
         """Collect RL performance data from a single rank"""
         profiler_data_path = data_map.get(Constant.PROFILER_DATA_PATH)
-        rank_id = data_map.get(self.RANK_ID)
+        rank_id = data_map.get(Constant.RANK_ID)
         roll = data_map.get(self.ROLL)
 
         if not profiler_data_path:
