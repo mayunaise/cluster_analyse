@@ -18,6 +18,7 @@ def allocate_prof_data(input_path: str):
     return data_map
 
 def main():
+
     arg_parser = argparse.ArgumentParser(description="集群调度可视化")
     arg_parser.add_argument("--input-path", default="test", help="profiling数据的原始路径")
     arg_parser.add_argument("--profiler-type", default="mstx", help="性能数据种类")
