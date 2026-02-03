@@ -96,7 +96,7 @@ def load_and_preprocess(input_data: pd.DataFrame) -> tuple[pd.DataFrame, float]:
     df.rename(
         columns={
             "roll": "Roll",
-            "domain": "Domain",
+            "name": "Name",
             "rank_id": "Rank ID",
             "start_time_ms": "Start",
             "end_time_ms": "Finish",
@@ -105,7 +105,7 @@ def load_and_preprocess(input_data: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         errors="ignore",
     )
 
-    required = ["Roll", "Domain", "Rank ID", "Start", "Finish"]
+    required = ["Roll", "Name", "Rank ID", "Start", "Finish"]
     for col in required:
         if col not in df.columns:
             raise ValueError(f"Required column missing: {col}")
@@ -136,13 +136,13 @@ def merge_short_events(df: pd.DataFrame, threshold_ms: float = 10.0) -> pd.DataF
             "Finish": short["Finish"].max(),
             "Roll": short.iloc[0]["Roll"],
             "Rank ID": short.iloc[0]["Rank ID"],
-            "Domain": short.iloc[0]["Domain"],
+            "Name": short.iloc[0]["Name"],
             "Duration": short["Finish"].max() - short["Start"].min(),
         }])
         return pd.concat([long, merged], ignore_index=True)
 
     return (
-        df.groupby(["Roll", "Rank ID", "Domain"], group_keys=False)
+        df.groupby(["Roll", "Rank ID", "Name"], group_keys=False)
         .apply(_merge_group)
         .reset_index(drop=True)
     )
@@ -155,7 +155,7 @@ def downsample_if_needed(
 ) -> pd.DataFrame:
     if len(df) <= max_records:
         return df
-    n_domains = df["Domain"].nunique()
+    n_domains = df["Name"].nunique()
     samples_per_domain = max_records // max(1, n_domains)
 
     def _sample_domain(g: pd.DataFrame) -> pd.DataFrame:
@@ -164,7 +164,7 @@ def downsample_if_needed(
         return g.sample(n=samples_per_domain, random_state=random_state)
 
     return (
-        df.groupby("Domain", group_keys=False)
+        df.groupby("Name", group_keys=False)
         .apply(_sample_domain)
         .reset_index(drop=True)
     )
@@ -199,13 +199,13 @@ def build_y_mappings(df: pd.DataFrame):
 
 
 def build_traces(df: pd.DataFrame, y_mapping: dict):
-    unique_domains = df["Domain"].unique()
+    unique_domains = df["Name"].unique()
     color_map = {dom: COLOR_PALETTE[i % len(COLOR_PALETTE)] for i, dom in enumerate(unique_domains)}
     bar_height = y_mapping.get("bar_height", 48)
 
     traces = []
     for domain in unique_domains:
-        dom_df = df[df["Domain"] == domain]
+        dom_df = df[df["Name"] == domain]
         trace = go.Bar(
             base=dom_df["Start"],
             x=dom_df["Finish"] - dom_df["Start"],
@@ -309,7 +309,7 @@ def assemble_figure(traces: List[go.Bar], df: pd.DataFrame, cfg: FigureConfig) -
                 buttons=[
                     dict(
                         args=[
-                            {"y": [df[df["Domain"] == t.name]["Y_default"].tolist() for t in traces]},
+                            {"y": [df[df["Name"] == t.name]["Y_default"].tolist() for t in traces]},
                             {
                                 "yaxis.tickvals": list(cfg.y_mappings["default"].values()),
                                 "yaxis.ticktext": list(cfg.y_mappings["default"].keys()),
@@ -320,7 +320,7 @@ def assemble_figure(traces: List[go.Bar], df: pd.DataFrame, cfg: FigureConfig) -
                     ),
                     dict(
                         args=[
-                            {"y": [df[df["Domain"] == t.name]["Y_by_rank"].tolist() for t in traces]},
+                            {"y": [df[df["Name"] == t.name]["Y_by_rank"].tolist() for t in traces]},
                             {
                                 "yaxis.tickvals": list(cfg.y_mappings["by_rank"].values()),
                                 "yaxis.ticktext": list(cfg.y_mappings["by_rank"].keys()),
