@@ -76,9 +76,21 @@ class ClusterDataParser:
                 continue
             # Convert nanoseconds to milliseconds
             ns_to_ms = Constant.NS_TO_US * Constant.US_TO_MS
-            start_time_ms = float(row["ts"]) / ns_to_ms
-            end_time_ms = start_time_ms + float(row["dur"]) / ns_to_ms
-            duration_ms = float(row["dur"]) / ns_to_ms
+
+            # Validate required fields exist
+            if "ts" not in row or "dur" not in row:
+                logger.warning(f"Row missing required fields: ts or dur. Skipping row.")
+                continue
+
+            try:
+                # Convert to float and calculate millisecond values
+                start_time_ms = float(row["ts"]) / ns_to_ms
+                duration_ms = float(row["dur"]) / ns_to_ms
+                end_time_ms = start_time_ms + duration_ms
+
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to convert time values: {e}. Row data: {row}. Skipping row.")
+                continue
 
             event_data = {
                 'name': row["name"],
