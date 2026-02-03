@@ -31,7 +31,7 @@ class DataPreprocessor:
         try:
             for (map_key, dir_list) in rank_id_map.items():
                 dir_list.sort(key=lambda x: x.split('_')[-3])
-                self.data_map[map_key] = dir_list[0]
+                self.data_map[map_key] = dir_list
         except Exception as e:
             raise RuntimeError("Found invalid directory name!") from e
         return self.data_map

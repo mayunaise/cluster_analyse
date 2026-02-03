@@ -196,23 +196,22 @@ class ClusterDataParser:
         rank_ids_with_roll = list(self._data_map.keys())
         data_paths: List[Dict] = []
         for task_roll, rank_id in rank_ids_with_roll:
-            rank_path = self._data_map[(task_roll, rank_id)]
-            profiler_data_path = self._get_profiler_data_path(rank_id, rank_path)
+            rank_path_list = self._data_map[(task_roll, rank_id)]
+            profiler_data_path_list = [self._get_profiler_data_path(rank_id, rank_path) for rank_path in rank_path_list]
+            for profiler_data_path in profiler_data_path_list:
+                data_path_dict = {
+                    Constant.RANK_ID: rank_id,
+                    self.ROLL: task_roll,
+                    Constant.PROFILER_DATA_PATH: "",
+                }
 
-            data_path_dict = {
-                Constant.RANK_ID: rank_id,
-                self.ROLL: task_roll,
-                Constant.PROFILER_DATA_PATH: "",
-            }
-
-            if os.path.exists(profiler_data_path):
-                data_path_dict[Constant.PROFILER_DATA_PATH] = profiler_data_path
-                data_paths.append(data_path_dict)
-            else:
-                logger.warning(
-                    f"Profiler data file not found, rank id: {rank_id}, data path: {profiler_data_path}."
-                )
-
+                if os.path.exists(profiler_data_path):
+                    data_path_dict[Constant.PROFILER_DATA_PATH] = profiler_data_path
+                    data_paths.append(data_path_dict)
+                else:
+                    logger.warning(
+                        f"Profiler data file not found, rank id: {rank_id}, data path: {profiler_data_path}."
+                    )
         return data_paths
 
     def clean_data(self):
