@@ -108,6 +108,73 @@ class ClusterDataParser:
         events.sort(key=lambda x: x['start_time_ms'])
 
         return events
+
+    def parse_rollout_data(self, profiler_data_path: str, rank_id: int, roll: str) -> pd.DataFrame:
+        """Parse rollout-prefixed profiler data.
+
+        Read json data, locate the {"ph":"M","name":"Python"} entry to get pid,
+        then parse only rows with that pid using the same logic as parse_rl_mstx_event.
+        """
+        data: List[Dict] = []
+        events: List[Dict] = []
+
+        with open(profiler_data_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if data is None or not data:
+            logger.warning(f"Rank {rank_id}: No rollout events found in json")
+            return events
+
+        python_id = None
+        for row in data:
+            if row.get("ph") == "M" and row.get("name") == "Python":
+                python_id = row.get("pid")
+                break
+
+        if python_id is None:
+            logger.warning(f"Rank {rank_id}: Python pid not found in json")
+            return events
+
+        for row in data:
+            if row.get("pid") != python_id:
+                continue
+
+            args = row.get("args")
+            if not isinstance(args, dict):
+                continue
+
+            # Convert nanoseconds to milliseconds
+            ns_to_ms = Constant.NS_TO_US * Constant.US_TO_MS
+
+            # Validate required fields exist
+            if "ts" not in row or "dur" not in row:
+                logger.warning(f"Row missing required fields: ts or dur. Skipping row.")
+                continue
+
+            try:
+                # Convert to float and calculate millisecond values
+                start_time_ms = float(row["ts"]) / ns_to_ms
+                duration_ms = float(row["dur"]) / ns_to_ms
+                end_time_ms = start_time_ms + duration_ms
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to convert time values: {e}. Row data: {row}. Skipping row.")
+                continue
+
+            event_data = {
+                'name': roll,
+                "roll": roll,
+                'domain': "default",
+                'start_time_ms': start_time_ms,
+                'end_time_ms': end_time_ms,
+                'duration_ms': duration_ms,
+                'rank_id': rank_id,
+                'tid': row["tid"]
+            }
+
+            events.append(event_data)
+
+        events.sort(key=lambda x: x['start_time_ms'])
+        return events
     
     def mapper_func(self):
         data_maps = self._get_rank_path_with_roll()
@@ -154,6 +221,10 @@ class ClusterDataParser:
         if not profiler_data_path:
             logger.warning(f"Rank {rank_id}: profiler_data_path not found")
             return None
+
+        profiler_name = os.path.basename(profiler_data_path)
+        if profiler_name.startswith("rollout_"):
+            return self.parse_rollout_data(profiler_data_path, rank_id, roll)
 
         return self.parse_rl_mstx_event(profiler_data_path, rank_id, roll)
 
@@ -231,4 +302,3 @@ class ClusterDataParser:
 
     def get_data(self):
         return self.events_summary
-

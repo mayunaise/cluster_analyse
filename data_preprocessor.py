@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import os
+from typing import Dict, List
 from constant import Constant
 import logging
 
@@ -13,16 +14,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class DataPreprocessor:
-    def __init__(self, path_list: str) -> None:
+    def __init__(self, path_list: List[Dict]) -> None:
         self.path_list = path_list
         self.data_map = {}
         pass
 
     def get_data_map(self):
         rank_id_map = defaultdict(list)
-        for dir_name in self.path_list:
+        for path_info in self.path_list:
+            roll = path_info.get("roll")
+            dir_name = path_info.get("path")
             rank_id = self.get_rank_id(dir_name)
-            task_roll = self.get_task_roll(dir_name)
+            task_roll = self.get_task_roll(dir_name) if self.get_task_roll(dir_name)!="default_roll" else roll
             if rank_id < 0:
                 logger.error(f"direct:{dir_name} fail to get rankid or rankid invalid.")
                 continue
