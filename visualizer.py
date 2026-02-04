@@ -66,7 +66,7 @@ def generate_rl_timeline(
         title_prefix: Prefix for the chart title
     """
     df, t0 = load_and_preprocess(input_data)
-    df = merge_short_events(df)
+    # df = merge_short_events(df)
     df = downsample_if_needed(df)
     y_mappings, y_axis_spacing = build_y_mappings(df)
     traces = build_traces(df, y_mappings["default"])
