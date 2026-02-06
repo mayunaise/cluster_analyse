@@ -162,7 +162,7 @@ class ClusterDataParser:
             'end_time_ms': end_time_ms,
             'duration_ms': duration_ms,
             'rank_id': rank_id,
-            'tid': row["tid"]
+            'tid': row["pid"]
         }
 
         events.append(event_data)
@@ -243,7 +243,6 @@ class ClusterDataParser:
 
         self.events_summary.sort(key=lambda x: x['start_time_ms'])
         self.events_summary = pd.DataFrame(self.events_summary)
-
 
     def _get_profiler_data_path(self, rank_id, data_path):
         if self._data_type == Constant.TEXT:
