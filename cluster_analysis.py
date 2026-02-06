@@ -1,6 +1,6 @@
 import argparse
 import os
-from parser import ClusterDataParser
+from parser import get_cluster_parser_fn
 from visualizer import get_cluster_visualizer_fn
 from constant import Constant
 from data_preprocessor import DataPreprocessor
@@ -44,7 +44,7 @@ def main():
     visualizer_config = visualizer_params
 
     # Get and call parser function
-    parser_fn = get_cluster_visualizer_fn(args.profiler_type)
+    parser_fn = get_cluster_parser_fn(args.profiler_type)
     data =  parser_fn(parser_config)
 
 

@@ -1,5 +1,6 @@
 from ast import Dict
 import os
+from tkinter import N
 from typing import Callable, List
 from dataclasses import dataclass
 import numpy as np
@@ -91,6 +92,9 @@ def load_and_preprocess(input_data: pd.DataFrame) -> tuple[pd.DataFrame, float]:
     Returns:
         Tuple of (preprocessed DataFrame, t0 offset)
     """
+    if input_data is None:
+        raise ValueError(f"input_data: {input_data} is None!")
+
     df = input_data.copy()
 
     df.rename(

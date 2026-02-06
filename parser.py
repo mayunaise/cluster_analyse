@@ -321,9 +321,11 @@ def get_cluster_parser_fn(fn_name):
     return CLUSTER_PARSER_REGISTRY[fn_name]
 
 @register_cluster_parser("mstx")
-def cluster_parser_mstx(config: Dict) -> pd.Dataframe:
+def cluster_parser_mstx(config: Dict) -> pd.DataFrame:
     mstx_parser = ClusterDataParser(config)
-    return mstx_parser._cluster_parser_mstx()
+    mstx_parser._cluster_parser_mstx()
+    res = mstx_parser.get_data()
+    return res
 
 @register_cluster_parser("nvtx")
 def cluster_parser_nvtx(config: Dict) -> pd.DataFrame:
