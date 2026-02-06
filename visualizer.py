@@ -16,8 +16,8 @@ ClusterVisualizerFn = Callable[
 ]
 
 COLOR_PALETTE = [
-    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+    "#4e79a7", "#f28e8b", "#59a14f", "#b07aa1", "#9c755f",
+    "#76b7b2", "#edc948", "#bab0ab", "#8cd17d", "#ff9da7",
 ]
 
 CLUSTER_VISUALIZER_REGISTRY: dict[str, ClusterVisualizerFn] = {}
@@ -66,7 +66,7 @@ def generate_rl_timeline(
         title_prefix: Prefix for the chart title
     """
     df, t0 = load_and_preprocess(input_data)
-    # df = merge_short_events(df)
+    df = merge_short_events(df)
     df = downsample_if_needed(df)
     y_mappings, y_axis_spacing = build_y_mappings(df)
     traces = build_traces(df, y_mappings["default"])
@@ -208,7 +208,7 @@ def build_traces(df: pd.DataFrame, y_mapping: dict):
         dom_df = df[df["Name"] == domain]
         trace = go.Bar(
             base=dom_df["Start"],
-            x=dom_df["Finish"] - dom_df["Start"],
+            x=dom_df["Duration"],
             y=dom_df["Y_default"],
             orientation="h",
             name=domain,
@@ -261,7 +261,7 @@ def assemble_figure(traces: List[go.Bar], df: pd.DataFrame, cfg: FigureConfig) -
         yaxis_title="Module - Rank",
         xaxis=dict(
             range=[0, max_time * (1 + cfg.xaxis_max_pad_ratio)],
-            tickformat=".3f",
+            tickformat=".1f",
             nticks=cfg.nticks,
         ),
         yaxis=dict(
@@ -355,4 +355,3 @@ def save_html(fig: go.Figure, output_dir: str, output_filename: str):
             "toImageButtonOptions": {"format": "png", "scale": 2},
         },
     )
-

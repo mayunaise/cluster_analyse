@@ -12,7 +12,8 @@ def allocate_prof_data(input_path: str):
     for root, dirs, _ in os.walk(input_path):
         for dir_name in dirs:
             if dir_name.endswith(Constant.PT_PROF_SUFFIX):
-                ascend_pt_dirs.append({"roll": os.path.dirname(dir_name), "path": os.path.join(root, dir_name)})
+                path = os.path.join(root, dir_name)
+                ascend_pt_dirs.append({"roll": os.path.dirname(path).split('/')[-1], "path": path})
     data_processor = DataPreprocessor(ascend_pt_dirs)
     data_map = data_processor.get_data_map()
     return data_map

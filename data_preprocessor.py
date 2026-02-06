@@ -25,7 +25,9 @@ class DataPreprocessor:
             roll = path_info.get("roll")
             dir_name = path_info.get("path")
             rank_id = self.get_rank_id(dir_name)
-            task_roll = self.get_task_roll(dir_name) if self.get_task_roll(dir_name)!="default_roll" else roll
+            task_roll = self.get_task_roll(dir_name)
+            if task_roll is None:
+                task_roll = roll
             if rank_id < 0:
                 logger.error(f"direct:{dir_name} fail to get rankid or rankid invalid.")
                 continue
@@ -60,5 +62,4 @@ class DataPreprocessor:
                 task_roll = config.get("roll")
                 if task_roll:
                     return task_roll
-        return "default_roll"
-        pass
+        return None

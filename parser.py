@@ -75,7 +75,7 @@ class ClusterDataParser:
             if "event_type" not in args or "domain" not in args:
                 continue
             # Convert nanoseconds to milliseconds
-            ns_to_ms = Constant.NS_TO_US * Constant.US_TO_MS
+            us_to_ms = Constant.US_TO_MS
 
             # Validate required fields exist
             if "ts" not in row or "dur" not in row:
@@ -84,8 +84,8 @@ class ClusterDataParser:
 
             try:
                 # Convert to float and calculate millisecond values
-                start_time_ms = float(row["ts"]) / ns_to_ms
-                duration_ms = float(row["dur"]) / ns_to_ms
+                start_time_ms = float(row["ts"]) / us_to_ms
+                duration_ms = float(row["dur"]) / us_to_ms
                 end_time_ms = start_time_ms + duration_ms
 
             except (ValueError, TypeError) as e:
@@ -104,17 +104,10 @@ class ClusterDataParser:
             }
 
             events.append(event_data)
-        # 按照 start_time_ms 从小到大排序
-        events.sort(key=lambda x: x['start_time_ms'])
 
         return events
 
-    def parse_rollout_data(self, profiler_data_path: str, rank_id: int, roll: str) -> pd.DataFrame:
-        """Parse rollout-prefixed profiler data.
-
-        Read json data, locate the {"ph":"M","name":"Python"} entry to get pid,
-        then parse only rows with that pid using the same logic as parse_rl_mstx_event.
-        """
+    def parse_overlap_analysis_data(self, profiler_data_path: str, rank_id: int, roll: str) -> pd.DataFrame:
         data: List[Dict] = []
         events: List[Dict] = []
 
@@ -125,26 +118,25 @@ class ClusterDataParser:
             logger.warning(f"Rank {rank_id}: No rollout events found in json")
             return events
 
-        python_id = None
+        process_id = None
+        start_ids = None
+        end_ids = None
         for row in data:
-            if row.get("ph") == "M" and row.get("name") == "Python":
-                python_id = row.get("pid")
+            if row.get("ph") == "M" and row.get("args").get("name") == "Overlap Analysis":
+                process_id = row.get("pid")
                 break
 
-        if python_id is None:
-            logger.warning(f"Rank {rank_id}: Python pid not found in json")
+        if process_id is None:
+            logger.warning(f"Rank {rank_id}: Overlap Analysis process not found in json")
             return events
 
         for row in data:
-            if row.get("pid") != python_id:
+            if row.get("pid") != process_id:
                 continue
 
             args = row.get("args")
             if not isinstance(args, dict):
                 continue
-
-            # Convert nanoseconds to milliseconds
-            ns_to_ms = Constant.NS_TO_US * Constant.US_TO_MS
 
             # Validate required fields exist
             if "ts" not in row or "dur" not in row:
@@ -153,12 +145,24 @@ class ClusterDataParser:
 
             try:
                 # Convert to float and calculate millisecond values
-                start_time_ms = float(row["ts"]) / ns_to_ms
-                duration_ms = float(row["dur"]) / ns_to_ms
-                end_time_ms = start_time_ms + duration_ms
+                start_time_ns = float(row["ts"])
+                duration_ns = float(row["dur"])
+                end_time_ns = start_time_ns + duration_ns
+
+                if start_ids is None or start_time_ns < start_ids:
+                    start_ids = start_time_ns
+                if end_ids is None or end_time_ns > end_ids:
+                    end_ids = end_time_ns
+
             except (ValueError, TypeError) as e:
                 logger.warning(f"Failed to convert time values: {e}. Row data: {row}. Skipping row.")
                 continue
+
+            # Convert to milliseconds
+            us_to_ms = Constant.US_TO_MS
+            start_time_ms = start_ids / us_to_ms
+            duration_ms = (end_ids - start_ids) / us_to_ms
+            end_time_ms = start_time_ms + duration_ms
 
             event_data = {
                 'name': roll,
@@ -172,8 +176,7 @@ class ClusterDataParser:
             }
 
             events.append(event_data)
-
-        events.sort(key=lambda x: x['start_time_ms'])
+            
         return events
     
     def mapper_func(self):
@@ -222,11 +225,7 @@ class ClusterDataParser:
             logger.warning(f"Rank {rank_id}: profiler_data_path not found")
             return None
 
-        profiler_name = os.path.basename(profiler_data_path)
-        if profiler_name.startswith("rollout_"):
-            return self.parse_rollout_data(profiler_data_path, rank_id, roll)
-
-        return self.parse_rl_mstx_event(profiler_data_path, rank_id, roll)
+        return self.parse_overlap_analysis_data(profiler_data_path, rank_id, roll)
 
     def reducer_func(self, mapper_res):
         """Process data collected from all ranks"""
@@ -252,7 +251,9 @@ class ClusterDataParser:
             groups_set = roll_rank_to_comm_groups.get((event['roll'], event['rank_id']), set())
             event["communication_group"] = ",".join(groups_set) if groups_set else ""
 
+        self.events_summary.sort(key=lambda x: x['start_time_ms'])
         self.events_summary = pd.DataFrame(self.events_summary)
+
 
     def _get_profiler_data_path(self, rank_id, data_path):
         if self._data_type == Constant.TEXT:
