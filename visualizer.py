@@ -172,7 +172,7 @@ def downsample_if_needed(
 
 def build_y_mappings(df: pd.DataFrame):
     df["Y_Label"] = df["Roll"] + " - Rank " + df["Rank ID"].astype(str)
-    unique_y_labels = sorted(df["Y_Label"].unique())
+    unique_y_labels = df["Y_Label"].unique()
 
     def _extract_rank(label: str):
         try:
@@ -183,7 +183,7 @@ def build_y_mappings(df: pd.DataFrame):
     y_axis_spacing = max(60, min(100, 800 // max(1, len(unique_y_labels))))
     bar_height = y_axis_spacing * 0.8
 
-    y_labels_default = sorted(unique_y_labels)
+    y_labels_default = unique_y_labels
     mapping_default = {label: i * y_axis_spacing for i, label in enumerate(y_labels_default)}
     df["Y_default"] = df["Y_Label"].map(mapping_default)
 

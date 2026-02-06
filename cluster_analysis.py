@@ -37,7 +37,6 @@ def main():
         Constant.DATA_TYPE: args.data_type,  # Default to TEXT type
         Constant.DATA_MAP: data_map,
         Constant.RANK_LIST: args.rank_list,
-        Constant.PROFILER_TYPE: args.profiler_type
     }
     visualizer_params = {}
 
@@ -45,9 +44,8 @@ def main():
     visualizer_config = visualizer_params
 
     # Get and call parser function
-    json_parser = ClusterDataParser(parser_config)
-    json_parser.parse()
-    data = json_parser.get_data()
+    parser_fn = get_cluster_visualizer_fn(args.profiler_type)
+    data =  parser_fn(parser_config)
 
 
     # Call visualizer

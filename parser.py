@@ -1,4 +1,6 @@
+from ast import parse
 import logging
+from pyexpat import ParserCreate
 from typing import List, Dict, Callable, Optional
 import json
 import os
@@ -23,31 +25,19 @@ class ClusterDataParser:
 
     def __init__(self, params) -> None:
         self.events_summary: Optional[pd.DataFrame] = None
-        self._profiler_type = params.get(Constant.PROFILER_TYPE, "mstx")
         self._data_type = params.get(Constant.DATA_TYPE, {})
         self._data_map = params.get(Constant.DATA_MAP, {})
         rank_list = params.get(Constant.RANK_LIST, 'all')
         self._rank_list = rank_list if rank_list == "all" else [int(rank) for rank in rank_list.split(",") if rank.isdigit()]
-        pass
 
-    def parse(self):
-        """Parse data based on _profiler_type."""
-        if self._profiler_type == "mstx":
-            return self.cluster_parser_mstx()
-        elif self._profiler_type == "nvtx":
-            return self.cluster_parser_nvtx()
-        else:
-            raise ValueError(f"Unsupported profiler type: {self._profiler_type}")
 
-    def cluster_parser_mstx(self):
+    def _cluster_parser_mstx(self):
         mapper_res = self.mapper_func()
         self.reducer_func(mapper_res)
         logger.info("Parsed in mstx")
-        pass
 
-    def cluster_parser_nvtx(self):
+    def _cluster_parser_nvtx(self):
         logger.info("Parsed in mstx")
-        pass
 
     def parse_rl_mstx_event(self, profiler_data_path: str, rank_id: int, roll: str) -> pd.DataFrame:
         """Parse MSTX json and return rows whose args contain event_type and domain as a DataFrame.
@@ -158,24 +148,24 @@ class ClusterDataParser:
                 logger.warning(f"Failed to convert time values: {e}. Row data: {row}. Skipping row.")
                 continue
 
-            # Convert to milliseconds
-            us_to_ms = Constant.US_TO_MS
-            start_time_ms = start_ids / us_to_ms
-            duration_ms = (end_ids - start_ids) / us_to_ms
-            end_time_ms = start_time_ms + duration_ms
+        # Convert to milliseconds
+        us_to_ms = Constant.US_TO_MS
+        start_time_ms = start_ids / us_to_ms
+        duration_ms = (end_ids - start_ids) / us_to_ms
+        end_time_ms = start_time_ms + duration_ms
 
-            event_data = {
-                'name': roll,
-                "roll": roll,
-                'domain': "default",
-                'start_time_ms': start_time_ms,
-                'end_time_ms': end_time_ms,
-                'duration_ms': duration_ms,
-                'rank_id': rank_id,
-                'tid': row["tid"]
-            }
+        event_data = {
+            'name': roll,
+            "roll": roll,
+            'domain': "default",
+            'start_time_ms': start_time_ms,
+            'end_time_ms': end_time_ms,
+            'duration_ms': duration_ms,
+            'rank_id': rank_id,
+            'tid': row["tid"]
+        }
 
-            events.append(event_data)
+        events.append(event_data)
             
         return events
     
@@ -303,3 +293,40 @@ class ClusterDataParser:
 
     def get_data(self):
         return self.events_summary
+
+
+ClusterParserFn = Callable[
+    [
+        str,
+        str,
+        Dict
+    ],
+    pd.DataFrame,
+]
+
+CLUSTER_PARSER_REGISTRY: dict[str, ClusterParserFn] = {}
+
+def register_cluster_parser(name: str) -> Callable[[ClusterParserFn], ClusterParserFn]:
+
+    def decorator(func: ClusterParserFn) -> ClusterParserFn:
+        CLUSTER_PARSER_REGISTRY[name] = func
+        return func
+
+    return decorator
+
+def get_cluster_parser_fn(fn_name):
+    if fn_name not in CLUSTER_PARSER_REGISTRY:
+        raise ValueError(
+            f"Unsupported cluster parser: {fn_name}. Supported fns are: {list(CLUSTER_PARSER_REGISTRY.keys())}"
+        )
+    return CLUSTER_PARSER_REGISTRY[fn_name]
+
+@register_cluster_parser("mstx")
+def cluster_parser_mstx(config: Dict) -> pd.Dataframe:
+    mstx_parser = ClusterDataParser(config)
+    return mstx_parser._cluster_parser_mstx()
+
+@register_cluster_parser("nvtx")
+def cluster_parser_nvtx(config: Dict) -> pd.DataFrame:
+    print("in nvtx")
+
